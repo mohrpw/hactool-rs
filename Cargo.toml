@@ -18,6 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 rayon = "1.10"
+ntfs-unthrottle = { git = "https://github.com/mohrpw/ntfs-unthrottle.git", tag = "v0.7.0", default-features = false }
 
 [profile.release]
 opt-level = 3
