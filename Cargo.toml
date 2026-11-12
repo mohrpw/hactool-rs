@@ -1,0 +1,28 @@
+[package]
+name = "hactool-rs"
+version = "1.4.0"
+edition = "2021"
+license = "ISC"
+description = "High-performance parallel Rust port of SciresM's hactool (Nintendo Switch file format tool)"
+readme = "README.md"
+keywords = ["nintendo-switch", "hactool", "nca", "nsp", "xci"]
+categories = ["command-line-utilities", "parser-implementations"]
+
+[lib]
+name = "hactool"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hactool"
+path = "src/main.rs"
+
+[dependencies]
+rayon = "1.10"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = false
+
