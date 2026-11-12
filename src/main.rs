@@ -651,6 +651,14 @@ fn main() {
     if !input_name.is_empty() {
         match File::open(&input_name) {
             Ok(f) => {
+                if !tool_ctx.settings.quiet {
+                    if let Ok(Some(kind)) = ntfs_unthrottle::compression_kind_of(&f) {
+                        eprintln!(
+                            "[WARN] Input '{}' has {} compression; random-access reads may be throttled.\n[WARN] Consider running `ntfs-unthrottle --fix \"{}\"` first.",
+                            input_name, kind, input_name
+                        );
+                    }
+                }
                 tool_ctx.file = Some(SharedFile::new(f));
             }
             Err(e) => {

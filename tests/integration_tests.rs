@@ -9,7 +9,7 @@ use hactool::types::{
     FileType, KeysetVariant, SharedFile, ACTION_EXTRACT, ACTION_INFO, ACTION_VERIFY, MAGIC_META,
     MAGIC_PFS0,
 };
-use hactool::utils::create_uncompressed_file;
+use hactool::utils::{create_uncompressed_file, os_makedir};
 use std::fs::File;
 use std::io::Write;
 use std::process::Command;
@@ -594,6 +594,15 @@ fn test_create_uncompressed_file_basic_and_windows_ntfs() {
                     attrs & FILE_ATTRIBUTE_COMPRESSED,
                     0,
                     "Expected FILE_ATTRIBUTE_COMPRESSED to be cleared on new output file"
+                );
+
+                let nested_dir = comp_dir.join("nested").join("romfs");
+                os_makedir(&nested_dir);
+                let dir_attrs = std::fs::metadata(&nested_dir).unwrap().file_attributes();
+                assert_eq!(
+                    dir_attrs & FILE_ATTRIBUTE_COMPRESSED,
+                    0,
+                    "Expected FILE_ATTRIBUTE_COMPRESSED to be cleared on os_makedir output directory"
                 );
             }
         }

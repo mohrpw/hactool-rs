@@ -139,7 +139,7 @@ pub fn memdump_stdout(prefix: &str, data: &[u8]) {
 }
 
 pub fn os_makedir<P: AsRef<Path>>(dir: P) {
-    let _ = fs::create_dir_all(dir);
+    let _ = ntfs_unthrottle::create_dir_all_uncompressed(dir);
 }
 
 pub fn os_rmdir<P: AsRef<Path>>(dir: P) {
@@ -147,75 +147,9 @@ pub fn os_rmdir<P: AsRef<Path>>(dir: P) {
 }
 
 /// Creates/truncates an output file and, on Windows NTFS directories with inherited
-/// `FILE_ATTRIBUTE_COMPRESSED`, clears LZNT1 compression via `FSCTL_SET_COMPRESSION`
-/// before writing high-entropy Switch payloads. On uncompressed folders this adds
-/// zero `DeviceIoControl` calls.
-#[cfg(windows)]
-pub fn create_uncompressed_file<P: AsRef<Path>>(path: P) -> io::Result<File> {
-    use std::ffi::c_void;
-    use std::fs::OpenOptions;
-    use std::os::windows::fs::MetadataExt;
-    use std::os::windows::io::AsRawHandle;
-
-    const FILE_ATTRIBUTE_COMPRESSED: u32 = 0x0800;
-    const FSCTL_SET_COMPRESSION: u32 = 0x0009_C040;
-    const COMPRESSION_FORMAT_NONE: u16 = 0;
-
-    #[link(name = "kernel32")]
-    extern "system" {
-        fn DeviceIoControl(
-            h_device: *mut c_void,
-            dw_io_control_code: u32,
-            lp_in_buffer: *mut c_void,
-            n_in_buffer_size: u32,
-            lp_out_buffer: *mut c_void,
-            n_out_buffer_size: u32,
-            lp_bytes_returned: *mut u32,
-            lp_overlapped: *mut c_void,
-        ) -> i32;
-    }
-
-    let path = path.as_ref();
-    // FSCTL_SET_COMPRESSION requires FILE_READ_DATA | FILE_WRITE_DATA access.
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(path)
-        .or_else(|_| File::create(path))?;
-
-    let is_compressed = file
-        .metadata()
-        .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_COMPRESSED) != 0)
-        .unwrap_or(false);
-
-    if is_compressed {
-        let mut format = COMPRESSION_FORMAT_NONE;
-        let mut bytes_returned: u32 = 0;
-        // Best-effort: ignore unsupported filesystems (FAT32/exFAT/network shares).
-        unsafe {
-            DeviceIoControl(
-                file.as_raw_handle(),
-                FSCTL_SET_COMPRESSION,
-                (&mut format as *mut u16).cast(),
-                std::mem::size_of::<u16>() as u32,
-                std::ptr::null_mut(),
-                0,
-                &mut bytes_returned,
-                std::ptr::null_mut(),
-            );
-        }
-    }
-
-    Ok(file)
-}
-
-/// Creates/truncates an output file (pass-through to `File::create` on non-Windows targets).
-#[cfg(not(windows))]
-pub fn create_uncompressed_file<P: AsRef<Path>>(path: P) -> io::Result<File> {
-    File::create(path)
-}
+/// `FILE_ATTRIBUTE_COMPRESSED`, clears LZNT1 compression via `ntfs_unthrottle` before
+/// writing high-entropy Switch payloads (no-op fast path on uncompressed folders).
+pub use ntfs_unthrottle::create_uncompressed as create_uncompressed_file;
 
 pub fn save_buffer_to_file(buf: &[u8], filepath: &Filepath) {
     match create_uncompressed_file(&filepath.char_path) {
